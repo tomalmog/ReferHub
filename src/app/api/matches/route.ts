@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     if (existing) {
       return new Response(JSON.stringify({ error: "Match already exists" }), { status: 409, headers: { "content-type": "application/json" } });
     }
-    // Escrow one available credit from the ASK owner
+    // Escrow one available credit from the ASK owner and set deadlines
     const created = await prisma.$transaction(async (tx: any) => {
       const askOwner = await tx.listing.findUnique({ where: { id: askId } }).then((l: any) => l?.profileId);
       if (!askOwner) throw new Error("Ask owner not found");
@@ -60,7 +60,20 @@ export async function POST(req: Request) {
       if (!credit) {
         throw Object.assign(new Error("Insufficient credits"), { httpStatus: 402 });
       }
-      const match = await tx.match.create({ data: { askListingId: askId, giveListingId: giveId } });
+
+      // Calculate deadlines
+      const now = new Date();
+      const acknowledgeBy = new Date(now.getTime() + 48 * 60 * 60 * 1000); // 48 hours from now
+      const submitBy = new Date(now.getTime() + 9 * 24 * 60 * 60 * 1000); // 9 days from now (2 days to accept + 7 days to submit)
+
+      const match = await tx.match.create({
+        data: {
+          askListingId: askId,
+          giveListingId: giveId,
+          acknowledgeBy,
+          submitBy,
+        }
+      });
       await tx.credit.update({ where: { id: credit.id }, data: { status: "ESCROWED" } });
       await tx.match.update({ where: { id: match.id }, data: { escrowCreditId: credit.id } });
       return await tx.match.findUnique({ where: { id: match.id }, include: { ask: true, give: true } });

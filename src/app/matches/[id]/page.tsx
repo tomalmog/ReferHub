@@ -45,6 +45,8 @@ export default function MatchChatPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [proofDescription, setProofDescription] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [acknowledgeBy, setAcknowledgeBy] = useState<string | null>(null);
+  const [submitBy, setSubmitBy] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +62,8 @@ export default function MatchChatPage() {
       setEscrowed(!!m.escrowCreditId);
       setIsGiver(m.isGiver || false);
       setCurrentUserProfileId(m.currentUserProfileId || "");
+      setAcknowledgeBy(m.acknowledgeBy);
+      setSubmitBy(m.submitBy);
     }
     const res = await fetch(`/api/matches/${id}/messages`, { cache: "no-store" });
     if (res.ok) setMessages(await res.json());
@@ -67,6 +71,24 @@ export default function MatchChatPage() {
     // Fetch proofs
     const proofsRes = await fetch(`/api/matches/${id}/proofs`, { cache: "no-store" });
     if (proofsRes.ok) setProofs(await proofsRes.json());
+  }
+
+  // Helper function to format time remaining
+  function formatTimeRemaining(deadline: string | null): string {
+    if (!deadline) return '';
+    const now = new Date();
+    const target = new Date(deadline);
+    const diff = target.getTime() - now.getTime();
+
+    if (diff <= 0) return 'Expired';
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days > 0) return `${days}d ${hours}h remaining`;
+    if (hours > 0) return `${hours}h ${minutes}m remaining`;
+    return `${minutes}m remaining`;
   }
 
   useEffect(() => {
@@ -158,6 +180,37 @@ export default function MatchChatPage() {
     }
   }
 
+  async function reviewProof(proofId: string, action: 'approve' | 'reject') {
+    try {
+      const res = await fetch(`/api/proofs/${proofId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        toast.error(error.error || "Failed to review proof");
+        return;
+      }
+
+      const { status } = await res.json();
+
+      // Update local proof status
+      setProofs((arr) =>
+        arr.map((p) => (p.id === proofId ? { ...p, status } : p))
+      );
+
+      if (action === 'approve') {
+        toast.success("Proof approved! Credit awarded to referrer.");
+      } else {
+        toast.success("Proof rejected.");
+      }
+    } catch (error) {
+      toast.error("An error occurred");
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex items-center justify-between">
@@ -167,6 +220,33 @@ export default function MatchChatPage() {
           {escrowed ? <Badge>Escrowed</Badge> : null}
         </div>
       </div>
+
+      {/* Deadline warnings */}
+      {status === "PENDING" && acknowledgeBy && (
+        <Card className="mt-4 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+          <CardContent className="py-3">
+            <p className="text-sm text-orange-900 dark:text-orange-100">
+              <span className="font-medium">
+                {isGiver ? "Please respond: " : "Awaiting response: "}
+              </span>
+              {formatTimeRemaining(acknowledgeBy)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {status === "ACCEPTED" && submitBy && proofs.length === 0 && (
+        <Card className="mt-4 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+          <CardContent className="py-3">
+            <p className="text-sm text-blue-900 dark:text-blue-100">
+              <span className="font-medium">
+                {isGiver ? "Submit proof by: " : "Proof deadline: "}
+              </span>
+              {formatTimeRemaining(submitBy)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Accept/Decline buttons for pending matches (giver only) */}
       {status === "PENDING" && isGiver && (
@@ -236,7 +316,11 @@ export default function MatchChatPage() {
                           {new Date(proof.createdAt).toLocaleString()}
                         </span>
                       </div>
-                      <Badge variant={proof.status === "APPROVED" ? "default" : "secondary"}>
+                      <Badge variant={
+                        proof.status === "APPROVED" ? "default" :
+                        proof.status === "REJECTED" ? "destructive" :
+                        "secondary"
+                      }>
                         {proof.status}
                       </Badge>
                     </div>
@@ -251,6 +335,29 @@ export default function MatchChatPage() {
                     >
                       View proof file →
                     </a>
+
+                    {/* Approve/Reject buttons (asker only, for SUBMITTED proofs) */}
+                    {!isGiver && proof.status === "SUBMITTED" && (
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <p className="text-xs text-muted-foreground flex-1">
+                          Review this proof to release escrow
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => reviewProof(proof.id, 'reject')}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => reviewProof(proof.id, 'approve')}
+                        >
+                          Approve
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
