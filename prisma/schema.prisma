@@ -38,6 +38,17 @@ enum ProofStatus {
   REJECTED
 }
 
+enum NotificationType {
+  MATCH_REQUEST
+  MATCH_ACCEPTED
+  NEW_MESSAGE
+  PROOF_SUBMITTED
+  PROOF_APPROVED
+  PROOF_REJECTED
+  MATCH_EXPIRED
+  CREDIT_EARNED
+}
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -67,6 +78,7 @@ model Profile {
   messagesSent       Message[] @relation("SenderMessages")
   credits            Credit[]
   proofsSubmitted    ReferralProof[] @relation("ProofSubmitter")
+  notifications      Notification[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -142,4 +154,16 @@ model ReferralProof {
   updatedAt       DateTime    @updatedAt
 }
 
+model Notification {
+  id          String           @id @default(cuid())
+  profileId   String
+  profile     Profile          @relation(fields: [profileId], references: [id])
+  type        NotificationType
+  title       String
+  message     String
+  link        String?          // Optional link to related resource (e.g., /matches/123)
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now())
 
+  @@index([profileId, read])
+}
