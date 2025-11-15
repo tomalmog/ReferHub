@@ -1,0 +1,138 @@
+// Dev uses SQLite for speed. We'll switch to Postgres in prod.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ListingType {
+  ASK
+  GIVE
+}
+
+enum MatchStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum CreditStatus {
+  AVAILABLE
+  ESCROWED
+  SPENT
+  RETURNED
+}
+
+enum CreditSource {
+  EARNED
+  GRANT
+}
+
+enum ProofStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?  @unique
+  profiles  Profile[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Profile for app-level data (separate from NextAuth). We may later
+// add PrismaAdapter models; using a distinct name avoids conflicts.
+model Profile {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  listings  Listing[]
+  messagesSent Message[] @relation("SenderMessages")
+  credits   Credit[]
+  proofsSubmitted ReferralProof[] @relation("ProofSubmitter")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Listing {
+  id                 String       @id @default(cuid())
+  profileId          String
+  profile            Profile      @relation(fields: [profileId], references: [id])
+  type               ListingType
+  role               String?
+  level              String?
+  targetCompanyId    String?
+  targetCompanyName  String?
+  notes              String?
+  active             Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  // Match relations
+  matchesAsAsk       Match[]      @relation("AskListing")
+  matchesAsGive      Match[]      @relation("GiveListing")
+}
+
+model Match {
+  id            String      @id @default(cuid())
+  askListingId  String
+  giveListingId String
+  ask           Listing     @relation("AskListing", fields: [askListingId], references: [id])
+  give          Listing     @relation("GiveListing", fields: [giveListingId], references: [id])
+  status        MatchStatus @default(PENDING)
+  escrowCreditId String? @unique
+  escrowCredit   Credit?     @relation("MatchEscrow", fields: [escrowCreditId], references: [id])
+  acknowledgeBy DateTime?   // Deadline for giver to accept/decline match request
+  submitBy      DateTime?   // Deadline for referral submission after acceptance
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  messages      Message[]
+  proofs        ReferralProof[]
+
+  @@unique([askListingId, giveListingId], name: "unique_match_pair")
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  matchId         String
+  match           Match    @relation(fields: [matchId], references: [id])
+  senderProfileId String
+  sender          Profile  @relation("SenderMessages", fields: [senderProfileId], references: [id])
+  body            String
+  createdAt       DateTime @default(now())
+}
+
+model Credit {
+  id         String        @id @default(cuid())
+  profileId  String
+  profile    Profile       @relation(fields: [profileId], references: [id])
+  status     CreditStatus  @default(AVAILABLE)
+  source     CreditSource  @default(GRANT)
+  match      Match?        @relation("MatchEscrow")
+  createdAt  DateTime      @default(now())
+}
+
+model ReferralProof {
+  id              String      @id @default(cuid())
+  matchId         String
+  match           Match       @relation(fields: [matchId], references: [id])
+  submittedById   String
+  submittedBy     Profile     @relation("ProofSubmitter", fields: [submittedById], references: [id])
+  fileUrl         String      // S3/Supabase URL for proof file (screenshot, email, etc.)
+  description     String?     // Optional notes about the proof
+  status          ProofStatus @default(SUBMITTED)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+

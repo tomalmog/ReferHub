@@ -34,3 +34,39 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Environment variables (Auth)
+
+Create a `.env.local` in `rfr/` with:
+
+```bash
+# NextAuth
+AUTH_SECRET=replace-with-random-string
+
+# Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# GitHub OAuth
+GITHUB_ID=
+GITHUB_SECRET=
+```
+
+Then restart the dev server.
+
+## Database (Dev)
+
+We use Prisma with SQLite locally. Add to `.env.local`:
+
+```bash
+DATABASE_URL="file:./prisma/dev.db"
+```
+
+Generate client and create the dev DB:
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+Health check: open `http://localhost:3000/api/health/db`.
