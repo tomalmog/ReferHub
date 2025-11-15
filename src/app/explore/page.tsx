@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 type Listing = {
@@ -13,6 +14,15 @@ type Listing = {
   level?: string | null;
   targetCompanyName?: string | null;
   createdAt: string;
+  profile?: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+    completionRate: number;
+    totalMatches: number;
+    successfulMatches: number;
+  };
 };
 
 export default function ExplorePage() {
@@ -113,6 +123,25 @@ export default function ExplorePage() {
                 {l.level ? `${l.level} • ` : ""}
                 {l.targetCompanyName ?? "Any company"}
               </div>
+
+              {/* Show completion rate for GIVE listings */}
+              {l.type === "GIVE" && l.profile && l.profile.totalMatches > 0 && (
+                <div className="mt-3 flex items-center gap-2">
+                  <Badge variant={l.profile.completionRate >= 80 ? "default" : l.profile.completionRate >= 50 ? "secondary" : "destructive"}>
+                    {l.profile.completionRate.toFixed(0)}% completion
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    ({l.profile.successfulMatches}/{l.profile.totalMatches})
+                  </span>
+                </div>
+              )}
+
+              {l.type === "GIVE" && l.profile && l.profile.totalMatches === 0 && (
+                <div className="mt-3">
+                  <Badge variant="outline">New referrer</Badge>
+                </div>
+              )}
+
               <Button
                 className="mt-4"
                 size="sm"

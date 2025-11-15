@@ -50,18 +50,25 @@ model Company {
 // Profile for app-level data (separate from NextAuth). We may later
 // add PrismaAdapter models; using a distinct name avoids conflicts.
 model Profile {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  image     String?
-  companyId String?
-  company   Company? @relation(fields: [companyId], references: [id])
-  listings  Listing[]
-  messagesSent Message[] @relation("SenderMessages")
-  credits   Credit[]
-  proofsSubmitted ReferralProof[] @relation("ProofSubmitter")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  name               String?
+  image              String?
+  companyId          String?
+  company            Company? @relation(fields: [companyId], references: [id])
+
+  // Reputation & stats
+  completionRate     Float    @default(100.0)  // Percentage of successful referrals
+  totalMatches       Int      @default(0)      // Total matches as giver
+  successfulMatches  Int      @default(0)      // Completed matches with approved proofs
+  isAdmin            Boolean  @default(false)  // Admin access flag
+
+  listings           Listing[]
+  messagesSent       Message[] @relation("SenderMessages")
+  credits            Credit[]
+  proofsSubmitted    ReferralProof[] @relation("ProofSubmitter")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Listing {

@@ -18,6 +18,19 @@ export async function GET(req: Request) {
       where,
       orderBy: { createdAt: "desc" },
       take: 50,
+      include: {
+        profile: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            completionRate: true,
+            totalMatches: true,
+            successfulMatches: true,
+          },
+        },
+      },
     });
     return new Response(JSON.stringify(listings), {
       status: 200,
